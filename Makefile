@@ -5,16 +5,20 @@ LDLIBS = -lm -pthread
 BUILD = build
 BENCH = $(BUILD)/bench/sequential
 PARALLEL_BENCH = $(BUILD)/bench/parallel
+PIPELINE_BENCH = $(BUILD)/bench/pipeline
 CORE = src/convolution.c src/parallel.c
 IO = src/io.c
 CORE_HEADERS = include/convolution.h include/parallel.h src/convolution_internal.h
 HEADERS = $(CORE_HEADERS) include/io.h
 STB_HEADERS = vendor/stb/stb_image.h vendor/stb/stb_image_write.h
+PIPELINE_SOURCES = src/pipeline.c src/convolution.c
+PIPELINE_HEADERS = include/pipeline.h include/convolution.h $(wildcard src/convolution_internal.h)
 FORMAT_FILES = $(wildcard src/*.[ch] include/*.h tests/*.c bench/*.c)
 
 .PHONY: all test sanitize tidy format format-check benchmark benchmark-save clean
 .PHONY: test-parallel benchmark-parallel benchmark-save-parallel tsan-parallel
-all: $(BUILD)/convolve
+.PHONY: test-pipeline benchmark-pipeline benchmark-save-pipeline tsan-pipeline
+all: $(BUILD)/convolve $(BUILD)/stream_convolve
 
 $(BUILD):
 	mkdir -p $@
@@ -40,7 +44,13 @@ $(BUILD)/check_cli_output: tests/check_cli_output.c $(CORE) $(IO) $(HEADERS) $(B
 $(BUILD)/test_parallel: tests/test_parallel.c $(CORE) $(CORE_HEADERS) | $(BUILD)
 	$(CC) $(CPPFLAGS) $(CFLAGS) $< $(CORE) $(LDFLAGS) $(LDLIBS) -o $@
 
-test: $(BUILD)/convolve $(BUILD)/test_convolution $(BUILD)/test_io $(BUILD)/check_cli_output test-parallel
+$(BUILD)/stream_convolve: src/stream_main.c $(PIPELINE_SOURCES) $(IO) $(PIPELINE_HEADERS) include/io.h $(BUILD)/stb.o | $(BUILD)
+	$(CC) $(CPPFLAGS) $(CFLAGS) $< $(PIPELINE_SOURCES) $(IO) $(BUILD)/stb.o $(LDFLAGS) $(LDLIBS) -o $@
+
+$(BUILD)/test_pipeline: tests/test_pipeline.c $(PIPELINE_SOURCES) $(PIPELINE_HEADERS) | $(BUILD)
+	$(CC) $(CPPFLAGS) $(CFLAGS) $< $(PIPELINE_SOURCES) $(LDFLAGS) $(LDLIBS) -o $@
+
+test: $(BUILD)/convolve $(BUILD)/test_convolution $(BUILD)/test_io $(BUILD)/check_cli_output test-parallel test-pipeline
 	"$(BUILD)/test_convolution"
 	cd "$(BUILD)" && ./test_io
 	sh tests/test_cli.sh "$(abspath $(BUILD))/convolve" "$(abspath $(BUILD))/check_cli_output"
@@ -49,11 +59,18 @@ test-parallel: $(BUILD)/test_parallel $(BUILD)/convolve $(BUILD)/check_cli_outpu
 	"$(BUILD)/test_parallel"
 	sh tests/test_parallel_cli.sh "$(abspath $(BUILD))/convolve" "$(abspath $(BUILD))/check_cli_output"
 
+test-pipeline: $(BUILD)/test_pipeline $(BUILD)/stream_convolve $(BUILD)/check_cli_output
+	"$(BUILD)/test_pipeline"
+	sh tests/test_pipeline_cli.sh "$(abspath $(BUILD))/stream_convolve" "$(abspath $(BUILD))/check_cli_output"
+
 sanitize:
 	$(MAKE) -B test BUILD="$(BUILD)/sanitize" CFLAGS='-std=c17 -O1 -g -Wall -Wextra -Wpedantic -Wconversion -Wshadow -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer'
 
 tsan-parallel:
 	$(MAKE) -B test-parallel BUILD="$(BUILD)/tsan" CFLAGS='-std=c17 -O1 -g -Wall -Wextra -Wpedantic -Wconversion -Wshadow -fsanitize=thread -fno-omit-frame-pointer'
+
+tsan-pipeline:
+	$(MAKE) -B test-pipeline BUILD="$(BUILD)/tsan" CFLAGS='-std=c17 -O1 -g -Wall -Wextra -Wpedantic -Wconversion -Wshadow -fsanitize=thread -fno-omit-frame-pointer'
 
 tidy: $(BUILD)/bench_config.h
 	clang-tidy $(wildcard src/*.c tests/*.c bench/*.c) -- $(CPPFLAGS) -I"$(BUILD)" $(CFLAGS) -pthread
@@ -105,6 +122,27 @@ benchmark-save-parallel:
 	done
 	mkdir -p bench/results/parallel
 	cp "$(PARALLEL_BENCH)/results.csv" "$(PARALLEL_BENCH)/summary.csv" "$(PARALLEL_BENCH)/timing.png" "$(PARALLEL_BENCH)/environment.txt" bench/results/parallel/
+
+benchmark-pipeline:
+	mkdir -p "$(PIPELINE_BENCH)"
+	rm -f "$(PIPELINE_BENCH)/complete"
+	mkdir -p "$(PIPELINE_BENCH)/images"
+	python3 bench/config.py c > "$(PIPELINE_BENCH)/bench_config.h"
+	python3 bench/config.py gnuplot > "$(PIPELINE_BENCH)/bench_config.gp"
+	$(CC) $(CPPFLAGS) -I"$(PIPELINE_BENCH)" $(CFLAGS) bench/benchmark_pipeline.c $(PIPELINE_SOURCES) $(IO) src/stb.c $(LDFLAGS) $(LDLIBS) -o "$(PIPELINE_BENCH)/benchmark"
+	python3 bench/environment.py "$(CC)" "$(CPPFLAGS)" "$(CFLAGS)" "$(LDFLAGS)" "$(LDLIBS)" > "$(PIPELINE_BENCH)/environment.txt"
+	"$(PIPELINE_BENCH)/benchmark" "$(PIPELINE_BENCH)/images" > "$(PIPELINE_BENCH)/results.csv"
+	python3 bench/pipeline_summary.py "$(PIPELINE_BENCH)/results.csv" > "$(PIPELINE_BENCH)/summary.csv"
+	gnuplot -c bench/pipeline.gp "$(PIPELINE_BENCH)/summary.csv" "$(PIPELINE_BENCH)/timing.png" "$(PIPELINE_BENCH)/bench_config.gp"
+	touch "$(PIPELINE_BENCH)/complete"
+
+benchmark-save-pipeline:
+	test -f "$(PIPELINE_BENCH)/complete"
+	for name in results.csv summary.csv timing.png environment.txt; do \
+		test -s "$(PIPELINE_BENCH)/$$name" || exit 1; \
+	done
+	mkdir -p bench/results/pipeline
+	cp "$(PIPELINE_BENCH)/results.csv" "$(PIPELINE_BENCH)/summary.csv" "$(PIPELINE_BENCH)/timing.png" "$(PIPELINE_BENCH)/environment.txt" bench/results/pipeline/
 
 clean:
 	rm -rf -- "$(BUILD)"

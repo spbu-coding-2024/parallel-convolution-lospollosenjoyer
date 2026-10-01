@@ -16,6 +16,14 @@ PARALLEL = {
     "grid_rows": 3,
     "runs": 20,
 }
+PIPELINE = {
+    "image_side": 384,
+    "batch_size": 12,
+    "kernel_sides": (1, 9),
+    "workers": (1, 2, 4),
+    "capacities": (1, 4, 8),
+    "runs": 30,
+}
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -27,6 +35,7 @@ if __name__ == "__main__":
         ("BENCH", BENCH),
         ("SEQUENTIAL", SEQUENTIAL),
         ("PARALLEL", PARALLEL),
+        ("PIPELINE", PIPELINE),
     ):
         for name, value in config.items():
             if isinstance(value, tuple):
