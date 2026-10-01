@@ -1,0 +1,12 @@
+Date: 2026-10-01
+CPU: Intel Core i5-11400H @ 2.70GHz; 6 cores, 12 hardware threads
+OS: Linux 7.2.7-arch1-1, x86_64
+Compiler: GCC 16.2.1 20260810
+CFLAGS: -std=c17 -O3 -Wall -Wextra -Wpedantic -Wconversion -Wshadow
+Timer: CLOCK_MONOTONIC; 1 warmup, 20 measured calls per configuration
+Image sides: 512, 1024; kernel sides: 3, 9
+Worker threads: 1, 2, 4, 8 (POSIX pthreads); grid: 4x3
+Timing includes correlation and thread creation/join; buffer preparation and validation excluded
+Validation: full pixel comparison with the sequential result after each call
+Output receives the complement of the reference before each call, outside the timer
+No CPU pinning; CPU frequency and background load uncontrolled

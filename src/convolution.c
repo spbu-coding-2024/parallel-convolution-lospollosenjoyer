@@ -1,4 +1,5 @@
 #include "convolution.h"
+#include "convolution_internal.h"
 
 #include <limits.h>
 #include <math.h>
@@ -76,7 +77,7 @@ static size_t wrap(int64_t coordinate, size_t length)
     return (size_t)(remainder < 0 ? remainder + (int64_t)length : remainder);
 }
 
-bool correlate(const Image *input, const Kernel *kernel, Image *output)
+bool correlation_valid(const Image *input, const Kernel *kernel, const Image *output)
 {
     if (!valid_image(input) || !valid_image(output) || kernel == NULL || kernel->data == NULL ||
         !valid_size(kernel->width, kernel->height, sizeof(double)) || kernel->width % 2 == 0 ||
@@ -91,25 +92,39 @@ bool correlate(const Image *input, const Kernel *kernel, Image *output)
         }
     }
 
+    return true;
+}
+
+bool correlation_pixel(const Image *input, const Kernel *kernel, Image *output, size_t x, size_t y)
+{
     const int64_t radius_x = (int64_t)(kernel->width / 2);
     const int64_t radius_y = (int64_t)(kernel->height / 2);
+    double sum = 0.0;
+    for (size_t ky = 0; ky < kernel->height; ++ky) {
+        size_t sy = wrap((int64_t)y + (int64_t)ky - radius_y, input->height);
+        for (size_t kx = 0; kx < kernel->width; ++kx) {
+            size_t sx = wrap((int64_t)x + (int64_t)kx - radius_x, input->width);
+            sum +=
+                (double)input->data[sy * input->width + sx] * kernel->data[ky * kernel->width + kx];
+        }
+    }
+    if (!isfinite(sum)) {
+        return false;
+    }
+    output->data[y * output->width + x] = sum <= 0.0 ? 0 : sum >= 255.0 ? 255 : (uint8_t)round(sum);
+    return true;
+}
+
+bool correlate(const Image *input, const Kernel *kernel, Image *output)
+{
+    if (!correlation_valid(input, kernel, output)) {
+        return false;
+    }
     for (size_t y = 0; y < input->height; ++y) {
         for (size_t x = 0; x < input->width; ++x) {
-            double sum = 0.0;
-            for (size_t ky = 0; ky < kernel->height; ++ky) {
-                size_t sy = wrap((int64_t)y + (int64_t)ky - radius_y, input->height);
-                for (size_t kx = 0; kx < kernel->width; ++kx) {
-                    size_t sx = wrap((int64_t)x + (int64_t)kx - radius_x, input->width);
-                    sum += (double)input->data[sy * input->width + sx] *
-                           kernel->data[ky * kernel->width + kx];
-                }
-            }
-            if (!isfinite(sum)) {
+            if (!correlation_pixel(input, kernel, output, x, y)) {
                 return false;
             }
-            output->data[y * output->width + x] = sum <= 0.0     ? 0
-                                                  : sum >= 255.0 ? 255
-                                                                 : (uint8_t)round(sum);
         }
     }
     return true;

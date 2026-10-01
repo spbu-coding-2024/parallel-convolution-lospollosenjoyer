@@ -7,6 +7,15 @@ SEQUENTIAL = {
     "kernel_sides": (3, 5, 9),
     "runs": 7,
 }
+PARALLEL = {
+    "image_sides": (512, 1024),
+    "kernel_sides": (3, 9),
+    "threads": (1, 2, 4, 8),
+    "modes": ("pixels", "rows", "columns", "grid"),
+    "grid_columns": 4,
+    "grid_rows": 3,
+    "runs": 20,
+}
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -17,6 +26,7 @@ if __name__ == "__main__":
     for prefix, config in (
         ("BENCH", BENCH),
         ("SEQUENTIAL", SEQUENTIAL),
+        ("PARALLEL", PARALLEL),
     ):
         for name, value in config.items():
             if isinstance(value, tuple):
@@ -29,4 +39,6 @@ if __name__ == "__main__":
             name = f"{prefix}_{name.upper()}"
             print(f"#define {name} {literal}" if args.format == "c" else f"{name} = {literal}")
     if args.format == "c":
+        splits = ", ".join(f"SPLIT_{mode.upper()}" for mode in PARALLEL["modes"])
+        print(f"#define PARALLEL_SPLITS {{{splits}}}")
         print("#endif")
