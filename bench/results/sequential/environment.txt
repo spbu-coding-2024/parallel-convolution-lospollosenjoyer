@@ -1,0 +1,12 @@
+Date: 2026-10-01
+CPU: Intel Core i5-11400H @ 2.70GHz
+OS: Linux 7.2.7-arch1-1, x86_64, glibc 2.44
+Compiler: GCC 16.2.1 20260810
+CFLAGS: -std=c17 -O3 -Wall -Wextra -Wpedantic -Wconversion -Wshadow
+Python: 3.14.7
+Gnuplot: 6.0 patchlevel 5
+Command: make benchmark && make benchmark-save
+Timer: CLOCK_MONOTONIC; 1 warmup, 7 measured calls per configuration
+Image sides: 256, 512, 1024, 2048; kernel sides: 3, 5, 9
+Timing includes correlate only; allocation, initialization, I/O and checksum excluded
+No CPU pinning; CPU frequency, temperature and background load uncontrolled

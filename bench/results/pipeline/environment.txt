@@ -1,0 +1,12 @@
+Date: 2026-10-01
+CPU: Intel Core i5-11400H @ 2.70GHz; 6 cores, 12 hardware threads
+OS: Linux 7.2.7-arch1-1, x86_64
+Compiler: GCC 16.2.1 20260810
+CFLAGS: -std=c17 -O3 -Wall -Wextra -Wpedantic -Wconversion -Wshadow
+Command: make benchmark-pipeline && make benchmark-save-pipeline
+Timer: CLOCK_MONOTONIC; 1 warmup, 30 measured batches per configuration
+Batch: 12 PNG images, 384x384; kernel sides: 1, 9
+Worker threads: 1, 2, 4 (POSIX pthreads); capacities: 1, 4, 8
+Timing includes reading, correlation and writing; output truncation and full pixel validation excluded
+Outputs truncated before each batch; warm filesystem cache; no fsync
+No CPU pinning; CPU frequency and background load uncontrolled

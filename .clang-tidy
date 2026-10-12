@@ -1,0 +1,10 @@
+Checks: >-
+  -*,
+  clang-analyzer-*,
+  bugprone-*,
+  performance-*,
+  portability-*,
+  -clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling
+WarningsAsErrors: '*'
+CheckOptions:
+  bugprone-multi-level-implicit-pointer-conversion.EnableInC: false
